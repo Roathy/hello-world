@@ -1,0 +1,620 @@
+<title>Mustache Frame Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#eef1f2; --surface:#ffffff; --sunk:#e3e8ea; --ink:#16202a; --muted:#56636f; --line:#cfd7dc;
+  --accent:#a8691f; --accent-ink:#ffffff; --guide:#0f8aa0; --cut:#c23b3b;
+  --stage:#dfe5e8; --stage2:#c9d3d8;
+  --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--bg:#11161b;--surface:#19212a;--sunk:#0d1216;--ink:#e6ecef;--muted:#98a6b1;--line:#2a3540;
+  --accent:#dba452;--accent-ink:#1a1206;--guide:#3fc3d8;--cut:#ff7070;--stage:#1b242c;--stage2:#0f151a;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#11161b;--surface:#19212a;--sunk:#0d1216;--ink:#e6ecef;--muted:#98a6b1;--line:#2a3540;
+  --accent:#dba452;--accent-ink:#1a1206;--guide:#3fc3d8;--cut:#ff7070;--stage:#1b242c;--stage2:#0f151a;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);padding-inline:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:40px 80px;display:grid;gap:56px}
+h1,h2,h3{text-wrap:balance;margin:0;font-weight:400}
+h1{font:400 clamp(2.6rem,6vw,4.6rem)/1 var(--serif);letter-spacing:-.01em}
+h1 em{color:var(--accent)}
+h2{font:400 clamp(1.9rem,3.6vw,2.6rem)/1.1 var(--serif)}
+h3{font:600 1.05rem/1.3 var(--sans)}
+p{margin:0}
+.eyebrow{font:500 .72rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:62ch;color:var(--muted);font-size:1.08rem}
+header{display:grid;gap:18px}
+
+/* style chooser */
+.picker{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.pick{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:12px;text-align:left;cursor:pointer;display:grid;gap:10px;font:inherit;transition:border-color .2s,transform .2s}
+.pick:hover{transform:translateY(-2px)}
+.pick:focus-visible,.btn:focus-visible,.step:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pick[aria-selected="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pick canvas{width:100%;aspect-ratio:5/4;border-radius:9px;background:var(--stage);display:block}
+.pick .n{font:500 .7rem var(--mono);color:var(--accent);letter-spacing:.1em}
+.pick .t{font:400 1.35rem/1.1 var(--serif)}
+.pick .s{font-size:.82rem;color:var(--muted)}
+
+/* studio */
+.studio{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:28px;align-items:start}
+.stagebox{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);display:grid;gap:12px}
+.stage{position:relative;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 20%,var(--stage),var(--stage2))}
+#main{width:100%;aspect-ratio:5/6;display:block;max-width:100%}
+.hud{position:absolute;inset:14px 14px auto 14px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.chip{font:500 .72rem/1 var(--mono);letter-spacing:.06em;background:color-mix(in srgb,var(--surface) 85%,transparent);border:1px solid var(--line);padding:7px 10px;border-radius:999px;backdrop-filter:blur(6px)}
+.chip b{color:var(--accent);font-weight:500}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{appearance:none;font:600 .9rem var(--sans);border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-left:auto}
+.seg button{appearance:none;border:0;background:var(--surface);color:var(--muted);font:500 .8rem var(--mono);padding:10px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.progress{height:4px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s}
+
+.panel{display:grid;gap:22px}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.meta div{background:var(--surface);padding:12px 14px;display:grid;gap:4px}
+.meta span{font:500 .66rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.meta strong{font:600 .95rem var(--sans);font-variant-numeric:tabular-nums}
+.why{border-left:3px solid var(--accent);padding:4px 0 4px 16px;color:var(--ink);max-width:60ch}
+ol.steps{list-style:none;padding:0;margin:0;display:grid;gap:8px;counter-reset:s}
+.step{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:start;padding:14px;border-radius:12px;border:1px solid transparent;cursor:pointer;background:transparent;text-align:left;width:100%;color:inherit;font:inherit}
+.step:hover{background:var(--surface)}
+.step[aria-current="step"]{background:var(--surface);border-color:var(--line);box-shadow:0 6px 24px -14px rgba(0,0,0,.35)}
+.step .num{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:500 .8rem var(--mono);border:1px solid var(--line);color:var(--muted)}
+.step[aria-current="step"] .num{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.step.done .num{color:var(--accent);border-color:var(--accent)}
+.step h3{margin-bottom:4px}
+.step p{color:var(--muted);font-size:.93rem}
+.step .guard{font:500 .7rem var(--mono);color:var(--accent);white-space:nowrap;padding-top:6px}
+.step .detail{display:none;margin-top:8px;display:none;gap:6px}
+.step[aria-current="step"] .detail{display:grid}
+.detail li{font-size:.9rem;color:var(--ink)}
+.detail ul{margin:0;padding-left:18px;display:grid;gap:4px}
+
+/* tools + tips */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:10px;align-content:start}
+.card p{color:var(--muted);font-size:.94rem}
+.tools{display:flex;flex-wrap:wrap;gap:8px}
+.tools span{font:500 .78rem var(--mono);background:var(--sunk);border-radius:8px;padding:7px 10px}
+.gauge{display:grid;gap:8px}
+.gauge .row{display:grid;grid-template-columns:110px 1fr 56px;gap:10px;align-items:center;font-size:.85rem}
+.gauge .bar{height:10px;border-radius:5px;background:var(--sunk);position:relative;overflow:hidden}
+.gauge .bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:5px;transition:width .6s}
+.gauge .v{font:500 .78rem var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:.82rem;color:var(--muted);max-width:70ch}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:20px}
+@media (max-width:860px){
+  .studio{grid-template-columns:1fr}
+  .stagebox{position:relative;top:0}
+}
+@media (max-width:560px){
+  .picker{grid-template-columns:1fr}
+  .pick{grid-template-columns:120px 1fr;align-items:center}
+  .meta{grid-template-columns:1fr}
+  .seg{margin-left:0}
+  .gauge .row{grid-template-columns:90px 1fr 48px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Personal grooming plan · built from your 7 reference photos</span>
+    <h1>Frame the <em>mustache</em>,<br>let the cheeks go quiet.</h1>
+    <p class="lede">Your strongest growth runs from the mustache down through the chin. The cheeks are thin and one side of the mustache is bushier. Pick a style, then step through the cut. The model on the left trims itself as you go.</p>
+  </header>
+
+  <section aria-label="Choose a style" class="picker" role="tablist" id="picker"></section>
+
+  <section class="studio">
+    <div class="stagebox">
+      <div class="stage">
+        <canvas id="main" width="500" height="600" aria-label="Illustrated face showing the beard at the current step"></canvas>
+        <div class="hud"><span class="chip" id="hudStep">Step 1</span><span class="chip">Guard <b id="hudGuard">—</b></span></div>
+      </div>
+      <div class="progress"><i id="prog"></i></div>
+      <div class="controls">
+        <button class="btn" id="prev" type="button">← Back</button>
+        <button class="btn primary" id="next" type="button">Next step →</button>
+        <button class="btn" id="play" type="button">▶ Play all</button>
+        <div class="seg" role="group" aria-label="Compare">
+          <button type="button" id="vBefore" aria-pressed="false">Before</button>
+          <button type="button" id="vNow" aria-pressed="true">Step</button>
+          <button type="button" id="vGuide" aria-pressed="true">Guides</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:grid;gap:10px">
+        <span class="eyebrow" id="styleNo"></span>
+        <h2 id="styleName"></h2>
+      </div>
+      <div class="meta" id="meta"></div>
+      <p class="why" id="why"></p>
+      <ol class="steps" id="steps"></ol>
+      <div class="card">
+        <h3>What you need</h3>
+        <div class="tools" id="tools"></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:22px">
+    <div style="display:grid;gap:8px"><span class="eyebrow">Side by side</span><h2>How the three compare</h2></div>
+    <div class="cols" id="compare"></div>
+  </section>
+
+  <section style="display:grid;gap:22px">
+    <div style="display:grid;gap:8px"><span class="eyebrow">Applies to all three</span><h2>Rules that keep it even</h2></div>
+    <div class="cols">
+      <div class="card"><h3>Trim to the thinner side</h3><p>Match the outline to your sparser side, never the fuller one. People read symmetry of the edge long before they notice density.</p></div>
+      <div class="card"><h3>Cut dry, cut in daylight</h3><p>Wet hair looks longer and lies flatter. Always comb out and dry first, and trim facing a window so shadows don't fake a gap.</p></div>
+      <div class="card"><h3>Fill a small gap</h3><p>A fine-tip brow pencil or beard pen one shade lighter than your hair, flicked in short strokes along the growth direction, reads as real hair.</p></div>
+      <div class="card"><h3>Minoxidil, maybe</h3><p>It thickens patchy facial hair for some men over 3–6 months, and it isn't for everyone. Ask a doctor or pharmacist before starting.</p></div>
+    </div>
+    <p class="note">Guard sizes are starting points. Go one size longer on your first pass; you can always take more off.</p>
+  </section>
+
+  <footer>Illustrations are drawn live in your browser from a simplified model of your face shape: long face, high forehead, hair pulled into a bun, full mustache-to-chin frame, thin cheeks.</footer>
+</div>
+
+<script>
+(() => {
+const W = 400, H = 480, CX = 200;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- face geometry ---------- */
+const facePath = new Path2D('M200,92 C266,92 286,150 284,230 C283,300 270,350 242,380 C226,396 212,402 200,402 C188,402 174,396 158,380 C130,350 117,300 116,230 C114,150 134,92 200,92Z');
+const tctx = document.createElement('canvas').getContext('2d');
+const inFace = (x,y) => tctx.isPointInPath(facePath, x, y);
+
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+function region(name, test, count, angleFn){
+  const roots = [];
+  let tries = 0;
+  count*=2; while (roots.length < count && tries < count * 60){
+    tries++;
+    const x = 110 + rnd() * 180, y = 200 + rnd() * 210;
+    if (!test(x,y)) continue;
+    roots.push({x, y, r: rnd(), l: 0.7 + rnd() * 0.6, c: rnd()*2-1, g: rnd(), a: angleFn(x,y) + (rnd()-.5)*0.35});
+  }
+  return {name, roots};
+}
+const side = x => x < CX ? -1 : 1;
+const REG = {
+  cheek: region('cheek', (x,y) => inFace(x,y) && y > 250 && Math.abs(x-CX) > 46 && y > 250 + (Math.abs(x-CX)-46)*-0.2 && !(Math.abs(x-CX) > 72 && y < 268), 520,
+    (x) => Math.PI/2 + side(x)*0.35),
+  side: region('side', (x,y) => inFace(x,y) && Math.abs(x-CX) > 70 && y > 210 && y < 275, 160,
+    (x) => Math.PI/2 + side(x)*0.1),
+  stache: region('stache', (x,y) => { const dx = Math.abs(x-CX); return dx < 40 && y < 324 && y > 298 + dx*0.18 && !(dx < 14 && y < 302); }, 520,
+    (x) => Math.PI/2 - side(x)*(0.15 + Math.abs(x-CX)/40*0.55)),
+  bars: region('bars', (x,y) => { const dx = Math.abs(x-CX); return dx > 30 && dx < 46 && y > 318 && y < 360 && inFace(x,y); }, 220,
+    (x) => Math.PI/2 + side(x)*0.12),
+  chin: region('chin', (x,y) => { const dx = Math.abs(x-CX); return dx < 44 && y > 340 && inFace(x,y) && !(dx < 6 && y < 348); }, 560,
+    (x) => Math.PI/2 - side(x)*Math.abs(x-CX)/44*0.25),
+  jaw: region('jaw', (x,y) => inFace(x,y) && Math.abs(x-CX) >= 44 && y > 348, 260,
+    (x) => Math.PI/2 + side(x)*0.25),
+};
+
+/* ---------- styles ---------- */
+const BEFORE = {
+  cheek:{len:13,dens:.34,clip:999}, side:{len:10,dens:.55,clip:999}, jaw:{len:16,dens:.6,clip:999},
+  stache:{len:17,dens:.95,clip:999,width:42,spread:0,asym:1.35}, bars:{len:16,dens:.9,clip:999},
+  chin:{len:24,dens:.92,clip:999}, frizz:1, wax:0
+};
+const merge = (a,b) => { const o = JSON.parse(JSON.stringify(a)); for (const k in b){ if (typeof b[k]==='object') Object.assign(o[k], b[k]); else o[k]=b[k]; } return o; };
+
+const STYLES = [
+ {
+  id:'chevron', name:'Chevron, trimmed to the lip line', short:'Chevron', tag:'The safest bet',
+  meta:[['Difficulty','Easy'],['Time','20 min'],['Upkeep','Every 5–7 days']],
+  gauge:{Safety:95,Effort:25,Coverage:55,Impact:60},
+  why:'A short, even length hides density differences. Unevenness mostly shows when the hair is long and each side falls differently.',
+  tools:['Trimmer + 6 mm / 8 mm guards','Fine-tooth comb','Small scissors','Detail trimmer (T-blade)','Mirror + daylight'],
+  steps:[
+   {t:'Wash, dry, comb down', g:'—', d:'Start from dry hair so you see the real length.', li:['Wash with shampoo, towel off, blow-dry on low heat.','Comb the mustache straight down over the lip, then the beard down and slightly forward.'], cfg:{frizz:.3}, guides:['comb']},
+   {t:'Take the whole mustache to 8 mm', g:'8 mm', d:'Even length first. Always start with the longer guard.', li:['Run the trimmer upward, against the grain, from lip to nose.','Tilt the head back; do left and right halves separately and compare.'], cfg:{stache:{len:12,asym:1.2}}, guides:['sweep-stache']},
+   {t:'Tidy the beard to match', g:'10 mm', d:'A long beard next to a short mustache looks unfinished.', li:['Cheeks and jaw at 10 mm, chin at 12 mm so it still tapers.','Keep the goatee connection. Do not open a gap at the corners.'], cfg:{cheek:{len:8},jaw:{len:10},chin:{len:15},bars:{len:11},side:{len:7}}, guides:['sweep-beard']},
+   {t:'Cut a clean edge at the lip line', g:'scissors', d:'The defining move of a chevron.', li:['Comb straight down, then cut with scissors or a T-blade exactly along the top of the upper lip.','Work from the center outward, a few hairs at a time.'], cfg:{stache:{clip:322}}, guides:['lip']},
+   {t:'Stop the ends at the mouth corners', g:'T-blade', d:'Keeps the shape a clean trapezoid.', li:['Trim any hair that hangs past the corners of your mouth.','Angle the ends slightly down to follow the corner of the lip.'], cfg:{stache:{width:34},bars:{len:9,clip:352}}, guides:['corners']},
+   {t:'Bring the bushy side down to match', g:'6 mm', d:'Match the thin side, not the full one.', li:['Your fuller side sits a few millimetres heavier. Run the 6 mm guard over just that half.','Step back from the mirror to judge, not closer.'], cfg:{stache:{asym:1.0,len:10},frizz:0}, guides:['balance']},
+  ]
+ },
+ {
+  id:'horseshoe', name:'Horseshoe-lite, connected to the chin', short:'Horseshoe-lite', tag:'Best for your face',
+  meta:[['Difficulty','Medium'],['Time','35 min'],['Upkeep','Shave cheeks every 2–3 days']],
+  gauge:{Safety:75,Effort:55,Coverage:85,Impact:90},
+  why:'Your strongest growth is exactly this zone. A crisp frame reads as intentional and draws the eye away from the gap. It also suits your long face and the man bun.',
+  tools:['Trimmer + 10 mm / 12 mm guards','Safety razor or cartridge','Shaving gel (clear)','Detail trimmer','Fine-tooth comb','Aftershave balm'],
+  steps:[
+   {t:'Bring everything to one length', g:'12 mm', d:'A uniform base makes the outline easier to see.', li:['Run a 12 mm guard over the whole beard and mustache.','Keep the chin at 14 mm if you want a slight taper downward.'], cfg:{cheek:{len:9},jaw:{len:11},side:{len:8},stache:{len:13,asym:1.2},bars:{len:12},chin:{len:17},frizz:.4}, guides:['sweep-beard']},
+   {t:'Mark the cheek line', g:'no guard', d:'Pencil it before you cut. It saves you from over-shaving one side.', li:['Imagine a line from your ear lobe down to about 1 cm outside each corner of your mouth.','Dot it with a white eyeliner or just rest the trimmer blade on it to check both sides.'], cfg:{}, guides:['cheekline']},
+   {t:'Shave the cheeks clean, ear to jaw', g:'razor', d:'This is where the patchy zone disappears.', li:['Take the bulk down with a bare trimmer first, then shave with the grain using a clear gel.','Include the sideburns below the ear top. Leave the hairline at the temple alone.'], cfg:{cheek:{dens:0},side:{dens:0},jaw:{dens:0}}, guides:['cheekline','sweep-cheek']},
+   {t:'Square up the bars', g:'T-blade', d:'Equal width left and right is what makes it look designed.', li:['The vertical bars run from the mustache corners down to the chin, about 1.5 cm wide.','Borrow width from the fuller side; you cannot add it to the thin one.'], cfg:{bars:{len:10}}, guides:['bars']},
+   {t:'Set the neckline', g:'bare', d:'Clean underneath so the frame floats.', li:['Neckline sits one finger above the Adam’s apple, curving back toward the jaw corners.','Everything below it goes. Keep the curve smooth, not a straight shelf.'], cfg:{chin:{clip:412}}, guides:['neck']},
+   {t:'Clean the lip line and finish', g:'scissors', d:'Keep a hint of overhang for softness.', li:['Trim the mustache so it just touches the top of the lip.','Rinse, pat dry, apply balm to the shaved cheeks.'], cfg:{stache:{clip:324,asym:1.0},frizz:0}, guides:['lip']},
+  ]
+ },
+ {
+  id:'walrus', name:'Walrus-light, grown out and trained', short:'Walrus-light', tag:'Most coverage, most patience',
+  meta:[['Difficulty','Patience'],['Time','6–10 weeks'],['Upkeep','Daily, 3 min']],
+  gauge:{Safety:60,Effort:90,Coverage:95,Impact:85},
+  why:'Length plus direction covers a gap far better than trimming does. It takes 6–10 weeks of awkward phase, though, and needs daily upkeep.',
+  tools:['Mustache comb','Soft mustache wax','Hair dryer','Trimmer + 8 mm guard','Small scissors'],
+  steps:[
+   {t:'Week 0: stop cutting the mustache', g:'8 mm beard', d:'Keep the beard short so the mustache becomes the feature.', li:['Beard to 8 mm all over. Do not touch the mustache at all.','Only trim the hairs that go into your mouth, from the inside edge.'], cfg:{cheek:{len:7},jaw:{len:8},side:{len:6},chin:{len:12},bars:{len:9},frizz:.6}, guides:['sweep-beard']},
+   {t:'Weeks 2–4: start training', g:'—', d:'The awkward phase. Direction matters more than length now.', li:['After every shower, comb the mustache from the center outward.','Blow-dry on low heat in the same direction, holding the comb in place.'], cfg:{stache:{len:22,spread:.4}}, guides:['comb-out']},
+   {t:'Weeks 4–6: it covers the lip', g:'—', d:'Longer hairs from the full side now reach across the gap.', li:['Let it drape over the upper lip. Resist evening it out.','Trim only stray hairs that block your mouth.'], cfg:{stache:{len:28,spread:.6}}, guides:['comb-out']},
+   {t:'Week 6+: comb sideways and wax', g:'wax', d:'A rice-grain amount of wax holds the shape.', li:['Warm the wax between fingertips, press it in from the root.','Comb the fuller side’s hairs across the thin patch, then set the outer ends slightly down.'], cfg:{stache:{len:31,spread:.85,asym:1.1},wax:1,frizz:.1}, guides:['comb-out']},
+   {t:'Weeks 8–10: shape the drape', g:'scissors', d:'Now you trim for shape, not length.', li:['Cut the bottom edge in a soft, even curve just below the lip line.','Keep the chin connection trimmed short so the mustache stays the star.'], cfg:{stache:{clip:338,asym:1.0},chin:{len:11},bars:{len:8},frizz:0}, guides:['drape']},
+  ]
+ }
+];
+// accumulate configs
+STYLES.forEach(s => { let c = BEFORE; s.steps.forEach(st => { c = merge(c, st.cfg); st.full = c; }); s.final = c; });
+
+/* ---------- drawing ---------- */
+function tokens(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  return {guide:g('--guide'), cut:g('--cut'), accent:g('--accent'), ink:g('--ink'), surface:g('--surface'), stage2:g('--stage2')};
+}
+
+function drawHead(ctx){
+  // shoulders + neck
+  const sk = ctx.createLinearGradient(0,380,0,480);
+  sk.addColorStop(0,'#c99776'); sk.addColorStop(1,'#d8a987');
+  ctx.fillStyle = sk;
+  ctx.beginPath();
+  ctx.moveTo(150,330); ctx.lineTo(250,330); ctx.lineTo(258,430);
+  ctx.quadraticCurveTo(330,450,400,468); ctx.lineTo(400,480); ctx.lineTo(0,480); ctx.lineTo(0,468);
+  ctx.quadraticCurveTo(70,450,142,430); ctx.closePath(); ctx.fill();
+  // neck shadow under jaw
+  const ns = ctx.createRadialGradient(200,395,10,200,395,80);
+  ns.addColorStop(0,'rgba(90,50,30,.45)'); ns.addColorStop(1,'rgba(90,50,30,0)');
+  ctx.fillStyle = ns; ctx.fillRect(120,370,160,90);
+  // collarbone hint
+  ctx.strokeStyle='rgba(120,70,45,.25)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(60,466); ctx.quadraticCurveTo(140,450,190,460); ctx.moveTo(210,460); ctx.quadraticCurveTo(260,450,340,466); ctx.stroke();
+
+  // bun
+  ctx.fillStyle='#17120f';
+  ctx.beginPath(); ctx.ellipse(200,70,34,26,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#2b2320'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(200,88,20,6,0,0,Math.PI*2); ctx.stroke();
+
+  // ears
+  for (const s of [-1,1]){
+    ctx.fillStyle='#cf9b7b';
+    ctx.beginPath(); ctx.ellipse(CX+s*86,238,13,28,s*0.12,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(120,60,40,.35)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(CX+s*87,236,6,16,s*0.12,-1.4,1.6); ctx.stroke();
+  }
+  // face
+  const fg = ctx.createRadialGradient(200,210,30,200,240,190);
+  fg.addColorStop(0,'#e7b999'); fg.addColorStop(.7,'#d9a685'); fg.addColorStop(1,'#bf8b6b');
+  ctx.fillStyle = fg; ctx.fill(facePath);
+  // hair cap, pulled back, receding temples
+  ctx.save(); ctx.clip(facePath);
+  ctx.fillStyle='#17120f';
+  ctx.beginPath();
+  ctx.moveTo(100,60); ctx.lineTo(300,60); ctx.lineTo(300,250);
+  ctx.bezierCurveTo(292,210,286,170,270,142);
+  ctx.bezierCurveTo(250,132,236,118,220,114);
+  ctx.bezierCurveTo(206,111,194,111,180,114);
+  ctx.bezierCurveTo(164,118,150,132,130,142);
+  ctx.bezierCurveTo(114,170,108,210,100,250);
+  ctx.closePath(); ctx.fill();
+  // pulled-back combing lines
+  ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1.2;
+  for (let i=0;i<14;i++){ const x = 128+i*11; ctx.beginPath(); ctx.moveTo(x,140-Math.abs(x-200)*.2); ctx.quadraticCurveTo(200+(x-200)*.6,110,200+(x-200)*.25,92); ctx.stroke(); }
+  // cheek shading
+  for (const s of [-1,1]){
+    const cg = ctx.createRadialGradient(CX+s*70,270,5,CX+s*70,270,60);
+    cg.addColorStop(0,'rgba(150,80,55,.16)'); cg.addColorStop(1,'rgba(150,80,55,0)');
+    ctx.fillStyle=cg; ctx.fillRect(CX+s*70-60,210,120,120);
+  }
+  ctx.restore();
+  // flyaways
+  ctx.strokeStyle='rgba(23,18,15,.6)'; ctx.lineWidth=.8;
+  let s2=3; const r2=()=>(s2=(s2*16807)%2147483647)/2147483647;
+  for (let i=0;i<22;i++){ const a = Math.PI*(1.05+r2()*.9); const x=200+Math.cos(a)*84, y=150+Math.sin(a)*70;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.bezierCurveTo(x+(r2()-.5)*30,y-10-r2()*14,x+(r2()-.5)*30,y-18,x+(r2()-.5)*24,y-8-r2()*20); ctx.stroke(); }
+
+  // brows
+  ctx.fillStyle='#1b1512';
+  for (const s of [-1,1]){
+    ctx.beginPath();
+    ctx.moveTo(CX+s*12,198); ctx.quadraticCurveTo(CX+s*36,184,CX+s*62,192);
+    ctx.quadraticCurveTo(CX+s*38,190,CX+s*13,205); ctx.closePath(); ctx.fill();
+  }
+  // eyes
+  for (const s of [-1,1]){
+    const ex = CX+s*36, ey=218;
+    ctx.fillStyle='#f4ece6';
+    ctx.beginPath(); ctx.moveTo(ex-17,ey); ctx.quadraticCurveTo(ex,ey-11,ex+17,ey); ctx.quadraticCurveTo(ex,ey+8,ex-17,ey); ctx.fill();
+    ctx.fillStyle='#4a2818'; ctx.beginPath(); ctx.arc(ex,ey-.5,6.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#120b08'; ctx.beginPath(); ctx.arc(ex,ey-.5,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(ex+2,ey-2.5,1.4,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#2a1a14'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(ex-17,ey); ctx.quadraticCurveTo(ex,ey-12,ex+17,ey); ctx.stroke();
+    ctx.strokeStyle='rgba(120,70,50,.3)'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(ex-14,ey+7); ctx.quadraticCurveTo(ex,ey+12,ex+14,ey+6); ctx.stroke();
+  }
+  // nose
+  ctx.strokeStyle='rgba(120,65,45,.45)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(190,215); ctx.quadraticCurveTo(186,255,182,278); ctx.stroke();
+  const ng = ctx.createRadialGradient(200,282,2,200,282,26);
+  ng.addColorStop(0,'rgba(235,170,140,.9)'); ng.addColorStop(1,'rgba(235,170,140,0)');
+  ctx.fillStyle=ng; ctx.beginPath(); ctx.arc(200,282,26,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(90,40,28,.55)';
+  ctx.beginPath(); ctx.ellipse(191,292,5,2.6,.3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(209,292,5,2.6,-.3,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(120,65,45,.5)'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(180,286); ctx.quadraticCurveTo(176,294,186,297); ctx.moveTo(220,286); ctx.quadraticCurveTo(224,294,214,297); ctx.stroke();
+  // lips
+  ctx.fillStyle='#c27d6c';
+  ctx.beginPath(); ctx.moveTo(172,327); ctx.quadraticCurveTo(190,317,200,321); ctx.quadraticCurveTo(210,317,228,327); ctx.quadraticCurveTo(200,330,172,327); ctx.fill();
+  ctx.fillStyle='#d49483';
+  ctx.beginPath(); ctx.moveTo(174,327); ctx.quadraticCurveTo(200,331,226,327); ctx.quadraticCurveTo(214,342,200,342); ctx.quadraticCurveTo(186,342,174,327); ctx.fill();
+  ctx.strokeStyle='rgba(90,40,30,.55)'; ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.moveTo(172,327); ctx.quadraticCurveTo(200,331,228,327); ctx.stroke();
+}
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function mixCfg(a,b,t){
+  const o = {};
+  for (const k in b){
+    if (typeof b[k]==='object'){ o[k]={}; for (const j in b[k]) o[k][j] = lerp(a[k][j], b[k][j], t); }
+    else o[k] = lerp(a[k], b[k], t);
+  }
+  return o;
+}
+
+function drawBeard(ctx, cfg, order){
+  // soft density underlayer so the growth reads as mass, not strings
+  for (const name of order){
+    const R = REG[name], c = cfg[name];
+    for (const h of R.roots){
+      if (h.r > c.dens || (name==='stache' && Math.abs(h.x-CX) > c.width)) continue;
+      const edge = Math.min(1, (c.dens - h.r) / 0.06) * Math.min(1, c.len/10);
+      ctx.fillStyle = `rgba(26,20,17,${(name==='cheek'?.07:.13)*edge})`;
+      ctx.beginPath(); ctx.arc(h.x, Math.min(h.y + c.len*.25, c.clip), 2.6, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  for (const name of order){
+    const R = REG[name], c = cfg[name];
+    if (!c) continue;
+    for (const h of R.roots){
+      if (h.r > c.dens) continue;
+      const edge = Math.min(1, (c.dens - h.r) / 0.06);
+      if (name==='stache' && Math.abs(h.x-CX) > c.width) continue;
+      let len = c.len * h.l * 0.72;
+      if (name==='stache' && h.x < CX) len *= c.asym;
+      let a = h.a;
+      if (name==='stache' && c.spread) a = h.a - side(h.x)*c.spread*(0.25 + Math.abs(h.x-CX)/40*0.6);
+      let ex = h.x + Math.cos(a)*len, ey = h.y + Math.sin(a)*len;
+      if (ey > c.clip){ const k = (c.clip - h.y)/(ey - h.y); if (k <= 0.05) continue; ex = h.x + (ex-h.x)*k; ey = c.clip; len*=k; }
+      const curl = (0.08 + cfg.frizz*0.35 * (name==='cheek'||name==='jaw'?1.3:1)) * (1 - cfg.wax*0.8);
+      const mx = (h.x+ex)/2 - Math.sin(a)*len*curl*h.c, my = (h.y+ey)/2 + Math.cos(a)*len*curl*h.c;
+      const grey = h.g > 0.93 ? 1 : 0;
+      ctx.strokeStyle = grey ? `rgba(150,140,135,${.75*edge})` : `rgba(${18+h.g*14|0},${14+h.g*10|0},${12+h.g*8|0},${(.72+h.l*.2)*edge})`;
+      ctx.lineWidth = name==='cheek' ? .6 : .8;
+      ctx.beginPath(); ctx.moveTo(h.x,h.y); ctx.quadraticCurveTo(mx,my,ex,ey); ctx.stroke();
+    }
+  }
+}
+const ORDER = ['side','cheek','jaw','bars','chin','stache'];
+
+/* guides */
+function guidePaths(name){
+  switch(name){
+    case 'lip': return [[[160,322],[240,322]]];
+    case 'corners': return [[[166,312],[166,340]],[[234,312],[234,340]]];
+    case 'bars': return [[[154,318],[156,388]],[[172,318],[172,392]],[[228,318],[228,392]],[[246,318],[244,388]]];
+    case 'cheekline': return [[[118,268],[150,322],[154,360]],[[282,268],[250,322],[246,360]]];
+    case 'neck': return [[[146,396],[172,410],[200,414],[228,410],[254,396]]];
+    case 'sweep-stache': return [[[164,318],[200,300],[236,318]]];
+    case 'sweep-beard': return [[[124,300],[150,370],[200,398],[250,370],[276,300]]];
+    case 'sweep-cheek': return [[[120,262],[130,320],[146,360]],[[280,262],[270,320],[254,360]]];
+    case 'balance': return [[[164,304],[164,334]],[[236,304],[236,334]]];
+    case 'comb': return [[[200,300],[200,340]],[[200,345],[200,400]]];
+    case 'comb-out': return [[[196,310],[160,322]],[[204,310],[240,322]]];
+    case 'drape': return [[[158,330],[180,338],[200,339],[220,338],[242,330]]];
+  }
+  return [];
+}
+function drawGuides(ctx, names, T, t){
+  ctx.save();
+  ctx.lineCap='round';
+  for (const n of names){
+    const paths = guidePaths(n);
+    const arrow = n.startsWith('sweep') || n.startsWith('comb');
+    for (const p of paths){
+      ctx.strokeStyle = arrow ? T.accent : T.guide;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(arrow ? [] : [6,5]);
+      ctx.globalAlpha = .95;
+      ctx.beginPath(); p.forEach(([x,y],i)=> i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.stroke();
+      if (arrow){
+        const [x1,y1]=p[p.length-2],[x2,y2]=p[p.length-1]; const a=Math.atan2(y2-y1,x2-x1);
+        ctx.setLineDash([]); ctx.fillStyle=T.accent; ctx.beginPath();
+        ctx.moveTo(x2,y2); ctx.lineTo(x2-9*Math.cos(a-.45),y2-9*Math.sin(a-.45)); ctx.lineTo(x2-9*Math.cos(a+.45),y2-9*Math.sin(a+.45)); ctx.fill();
+      }
+    }
+    if (n==='balance'){ label(ctx,T,'match this side',132,300); }
+    if (n==='lip') label(ctx,T,'lip line',248,318);
+    if (n==='neck') label(ctx,T,'1 finger above Adam’s apple',200,432,true);
+    if (n==='cheekline') label(ctx,T,'ear lobe → 1 cm past mouth corner',200,250,true);
+    if (n==='bars') label(ctx,T,'≈ 1.5 cm, equal both sides',200,408,true);
+    if (n==='corners') label(ctx,T,'stop here',244,344);
+  }
+  ctx.restore();
+  // trimmer traveling along first path
+  if (t < 1 && t > 0){
+    const p = guidePaths(names[names.length-1])[0]; if (!p) return;
+    const segs=[]; let total=0; for(let i=1;i<p.length;i++){ const d=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); segs.push(d); total+=d; }
+    let d = t*total, i=0; while (i<segs.length-1 && d>segs[i]){ d-=segs[i]; i++; }
+    const k = Math.min(1,d/segs[i]); const x=lerp(p[i][0],p[i+1][0],k), y=lerp(p[i][1],p[i+1][1],k);
+    const a = Math.atan2(p[i+1][1]-p[i][1],p[i+1][0]-p[i][0]);
+    ctx.save(); ctx.translate(x,y); ctx.rotate(a+Math.PI/2);
+    ctx.fillStyle='rgba(0,0,0,.25)'; roundRect(ctx,-9,-4,18,46,7); ctx.fill();
+    ctx.fillStyle='#2a3139'; roundRect(ctx,-10,-6,20,46,7); ctx.fill();
+    ctx.fillStyle='#c9ced3'; ctx.fillRect(-10,-8,20,5);
+    ctx.fillStyle=T.accent; ctx.beginPath(); ctx.arc(0,14,2.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function label(ctx,T,text,x,y,center){
+  ctx.font='500 10.5px "IBM Plex Mono", monospace';
+  const w = ctx.measureText(text).width + 12;
+  const lx = center ? x - w/2 : Math.min(x, W - w - 6);
+  ctx.setLineDash([]);
+  ctx.fillStyle=T.surface; ctx.globalAlpha=.92; roundRect(ctx,lx,y-9,w,18,9); ctx.fill();
+  ctx.globalAlpha=1; ctx.fillStyle=T.ink; ctx.fillText(text,lx+6,y+3.5);
+}
+
+function render(canvas, cfg, opts={}){
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(2, devicePixelRatio||1);
+  const cw = canvas.clientWidth || 300, ch = canvas.clientHeight || 360;
+  if (canvas.width !== Math.round(cw*dpr)){ canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr); }
+  const s = Math.min(canvas.width/W, canvas.height/H) * (opts.zoom||1);
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height);
+  const ox = (canvas.width - W*s)/2, oy = (canvas.height - H*s)/2 + (opts.shift||0)*s;
+  ctx.setTransform(s,0,0,s,ox,oy);
+  drawHead(ctx);
+  drawBeard(ctx, cfg, ORDER);
+  if (opts.guides) drawGuides(ctx, opts.guides, tokens(), opts.t ?? 1);
+}
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+let si = 0, step = 0, cur = BEFORE, view = 'now', showGuides = true, anim = null, playing = null;
+try { const v = JSON.parse(localStorage.getItem('mfs') || '{}'); if (v.si != null) { si = v.si; } } catch(e){}
+
+const picker = $('picker');
+STYLES.forEach((s,i) => {
+  const b = document.createElement('button');
+  b.className='pick'; b.type='button'; b.setAttribute('role','tab'); b.id='pick-'+s.id;
+  b.innerHTML = `<canvas></canvas><div style="display:grid;gap:4px"><span class="n">OPTION ${i+1}</span><span class="t">${s.short}</span><span class="s">${s.tag}</span></div>`;
+  b.onclick = () => selectStyle(i);
+  picker.appendChild(b);
+});
+
+const compare = $('compare');
+STYLES.forEach((s,i) => {
+  const d = document.createElement('div'); d.className='card';
+  d.innerHTML = `<span class="eyebrow">Option ${i+1}</span><h3>${s.short}</h3><div class="gauge">${Object.entries(s.gauge).map(([k,v])=>`<div class="row"><span>${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="v">${v}</span></div>`).join('')}</div><p>${s.why}</p>`;
+  compare.appendChild(d);
+});
+
+function drawThumbs(){
+  [...picker.children].forEach((b,i) => render(b.querySelector('canvas'), STYLES[i].final, {zoom:1.9, shift:-95}));
+}
+
+function selectStyle(i){
+  si = i; step = 0; stopPlay();
+  try { localStorage.setItem('mfs', JSON.stringify({si})); } catch(e){}
+  const s = STYLES[i];
+  [...picker.children].forEach((b,j)=>b.setAttribute('aria-selected', j===i));
+  $('styleNo').textContent = `Option ${i+1} · ${s.tag}`;
+  $('styleName').textContent = s.name;
+  $('why').textContent = s.why;
+  $('meta').innerHTML = s.meta.map(([k,v])=>`<div><span>${k}</span><strong>${v}</strong></div>`).join('');
+  $('tools').innerHTML = s.tools.map(t=>`<span>${t}</span>`).join('');
+  const ol = $('steps'); ol.innerHTML='';
+  s.steps.forEach((st,k) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button class="step" type="button" id="step-${s.id}-${k}"><span class="num">${k+1}</span><span><h3>${st.t}</h3><p>${st.d}</p><span class="detail"><ul>${st.li.map(x=>`<li>${x}</li>`).join('')}</ul></span></span><span class="guard">${st.g}</span></button>`;
+    li.firstChild.onclick = () => { stopPlay(); goStep(k); };
+    ol.appendChild(li);
+  });
+  cur = BEFORE; goStep(0, true);
+}
+
+function goStep(k, instant){
+  const s = STYLES[si];
+  step = Math.max(0, Math.min(s.steps.length-1, k));
+  view = 'now'; syncView();
+  [...$('steps').querySelectorAll('.step')].forEach((b,j)=>{
+    b.toggleAttribute('aria-current', false);
+    if (j===step) b.setAttribute('aria-current','step');
+    b.classList.toggle('done', j<step);
+  });
+  $('hudStep').textContent = `Step ${step+1} of ${s.steps.length}`;
+  $('hudGuard').textContent = s.steps[step].g;
+  $('prog').style.width = ((step+1)/s.steps.length*100)+'%';
+  $('prev').disabled = step===0;
+  $('next').textContent = step===s.steps.length-1 ? 'Start over ↺' : 'Next step →';
+  animateTo(s.steps[step].full, instant);
+}
+
+function animateTo(target, instant){
+  const from = cur, t0 = performance.now(), dur = (instant||reduce) ? 0 : 1300;
+  cancelAnimationFrame(anim);
+  const tick = now => {
+    const t = dur ? Math.min(1,(now-t0)/dur) : 1;
+    const e = t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+    cur = mixCfg(from, target, e);
+    draw(t);
+    if (t<1) anim = requestAnimationFrame(tick);
+  };
+  anim = requestAnimationFrame(tick);
+}
+
+function draw(t=1){
+  const s = STYLES[si];
+  const cfg = view==='before' ? BEFORE : cur;
+  render($('main'), cfg, {guides: (showGuides && view!=='before') ? s.steps[step].guides : null, t});
+}
+
+function syncView(){
+  $('vBefore').setAttribute('aria-pressed', view==='before');
+  $('vNow').setAttribute('aria-pressed', view==='now');
+  $('vGuide').setAttribute('aria-pressed', showGuides);
+}
+$('vBefore').onclick = () => { view='before'; syncView(); draw(); };
+$('vNow').onclick = () => { view='now'; syncView(); draw(); };
+$('vGuide').onclick = () => { showGuides=!showGuides; syncView(); draw(); };
+$('prev').onclick = () => { stopPlay(); goStep(step-1); };
+$('next').onclick = () => {
+  stopPlay();
+  if (step === STYLES[si].steps.length-1){ cur = BEFORE; goStep(0); } else goStep(step+1);
+};
+function stopPlay(){ if (playing){ clearInterval(playing); playing=null; $('play').textContent='▶ Play all'; } }
+$('play').onclick = () => {
+  if (playing) return stopPlay();
+  cur = BEFORE; goStep(0);
+  $('play').textContent='❚❚ Pause';
+  playing = setInterval(() => {
+    if (step >= STYLES[si].steps.length-1) return stopPlay();
+    goStep(step+1);
+  }, 2400);
+};
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea')) return;
+  if (e.key==='ArrowRight') $('next').click();
+  if (e.key==='ArrowLeft' && step>0) $('prev').click();
+});
+
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(()=>{ drawThumbs(); draw(); }, 120); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => draw());
+new MutationObserver(() => draw()).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+
+selectStyle(Math.min(si, STYLES.length-1));
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { drawThumbs(); draw(); });
+})();
+</script>
